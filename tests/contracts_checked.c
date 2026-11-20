@@ -40,7 +40,9 @@ static void assume_false(void)
     CXTR_ASSUME(x == 2);
 }
 
-static void unreachable(void)
+/* Not named `unreachable`: C23 reserves that as a <stddef.h> macro, which
+ * some C libraries pull in through other headers (e.g. MinGW's stdint.h). */
+static void reach_unreachable(void)
 {
     CXTR_UNREACHABLE();
 }
@@ -83,7 +85,8 @@ int main(void)
     errors += expect(assume_true, "assume_true", NULL);
     errors += expect(assume_false, "assume_false",
                      "assumption failed: x == 2");
-    errors += expect(unreachable, "unreachable", "unreachable code reached");
+    errors += expect(reach_unreachable, "reach_unreachable",
+                     "unreachable code reached");
     errors += expect(aligned_ok, "aligned_ok", NULL);
     errors += expect(misaligned, "misaligned", "assumed alignment failed: p");
     errors += expect(not_power_of_two, "not_power_of_two",
