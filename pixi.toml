@@ -10,4 +10,5 @@ version = "0.1.0"
 [dependencies]
 python = "*"
 gcc = "16.2.0.*"
+gxx = "16.2.0.*"
 clang = "23.1.6.*"
