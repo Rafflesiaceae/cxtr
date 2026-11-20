@@ -1,5 +1,7 @@
 # cxtr.h
 
+Version 20261100. `CXTR_VERSION` is `20261100L` (YYYYMMPP: year, month, two-digit patch; compare with `#if CXTR_VERSION >= 20261100L`).
+
 Single-header C annotation vocabulary (C89-C23, C++; GCC, Clang, MSVC). Each `CXTR_*` macro expands to a native, checked feature or to nothing. Annotations are checked contracts, not comments.
 
 ## Rules

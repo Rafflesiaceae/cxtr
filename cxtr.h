@@ -1,6 +1,7 @@
 /*
  * cxtr.h - checked semantic annotations for C, practical subset.
  *
+ * Version: 20261100 (YYYYMMPP, also available as CXTR_VERSION)
  * SPDX-License-Identifier: MIT-0
  *
  * Single self-contained header: copy it into your project and include it.
@@ -15,6 +16,12 @@
 
 #ifndef CXTR_H
 #define CXTR_H
+
+/* Release version as YYYYMMPP: year, month and a two-digit patch number
+ * (00 for the initial release of that month). It compares numerically:
+ * #if CXTR_VERSION >= 20261100L. Defined before the user config is
+ * included so the config can test it; not overridable. */
+#define CXTR_VERSION 20261100L
 
 #ifdef CXTR_USER_CONFIG
 #  include CXTR_USER_CONFIG
