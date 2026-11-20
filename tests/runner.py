@@ -165,13 +165,16 @@ def run_job(job, workdir, verbose):
     case = job.case
     is_cxx = job.std.startswith("c++")
     out = Path(workdir) / f"{case.name}-{job.compiler}-{job.std}"
+    # Name executables explicitly on Windows: GCC appends .exe on its own,
+    # other linkers may not, and the path is executed as given below.
+    exe = out.with_name(out.name + ".exe") if sys.platform == "win32" else out
     command = [job.compiler, f"-std={job.std}", *BASE_FLAGS,
                *COMPILERS[job.compiler], *case.flags]
     if is_cxx:
         command += ["-x", "c++"]
     command.append(str(case.path))
     if case.mode == "run":
-        command += ["-o", str(out)]
+        command += ["-o", str(exe)]
     else:
         # Compile to an object so diagnostics from later passes (e.g. GCC's
         # -Wmismatched-dealloc) are produced too.
@@ -194,8 +197,8 @@ def run_job(job, workdir, verbose):
     if compiled.returncode != 0:
         return Result(job, False, "\n".join(log))
     if case.mode == "run":
-        log.append(f"$ {out}")
-        ran = subprocess.run([str(out)], capture_output=True, text=True)
+        log.append(f"$ {exe}")
+        ran = subprocess.run([str(exe)], capture_output=True, text=True)
         if ran.stdout or ran.stderr:
             log.append((ran.stdout + ran.stderr).rstrip())
         if ran.returncode != 0:
