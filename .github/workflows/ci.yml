@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same ref supersedes the run for the older one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.platform }})
+    # One job per platform listed in pixi.toml, each on a native runner so
+    # the run tests execute on the platform they were built for. The jobs
+    # run in parallel, and fail-fast is off so one failing platform does
+    # not hide the results of the others.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-64
+            runner: ubuntu-24.04
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - platform: osx-64
+            runner: macos-26-intel
+          - platform: osx-arm64
+            runner: macos-26
+          - platform: win-64
+            runner: windows-2025
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Installs the locked environment; `locked` fails the job if
+      # pixi.lock is out of date with pixi.toml instead of re-solving.
+      - uses: prefix-dev/setup-pixi@v0.11.3
+        with:
+          pixi-version: v0.84.2
+          locked: true
+          cache: true
+
+      # dev.py runs the suite inside the pixi environment. It is started
+      # through python so the same command works on Windows.
+      - name: Run tests
+        run: python dev.py test
