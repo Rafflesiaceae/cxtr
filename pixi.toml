@@ -1,0 +1,13 @@
+[workspace]
+authors = ["Rafflesiaceae <rafflesiaceae.plant@gmail.com>"]
+channels = ['conda-forge']
+name = "cxtr"
+platforms = ["linux-64", "linux-aarch64", "win-64", "osx-64", "osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = "*"
+gcc = "16.2.0.*"
+clang = "23.1.6.*"
