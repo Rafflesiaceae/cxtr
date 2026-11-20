@@ -49,6 +49,10 @@ COMPILERS = {
               "-Wno-nullability-extension"],
 }
 
+# The C library headers the tests include, all of them C89 and C++98.
+# probe_std() compiles them to find the modes a compiler can test.
+PROBE_HEADERS = ["setjmp.h", "stddef.h", "stdio.h", "stdlib.h", "string.h"]
+
 DIRECTIVE = re.compile(r"^\s*\*?\s*(mode|expect|compilers|std|flags):\s*(.*?)\s*$")
 MODES = ("compile", "run", "fail")
 
@@ -136,14 +140,8 @@ def parse_case(path):
 
 
 def check_toolchain(compilers):
-    """Make sure each compiler comes from the pixi environment.
-
-    Returns the set of compilers that also have a working C++ frontend:
-    conda-forge's gcc package ships only the C compiler, so C++ is checked
-    with whichever compilers can actually do it.
-    """
+    """Make sure each compiler comes from the pixi environment."""
     env_root = ROOT / ".pixi" / "envs"
-    cxx = set()
     for compiler in compilers:
         found = shutil.which(compiler)
         if not found:
@@ -153,11 +151,22 @@ def check_toolchain(compilers):
         except ValueError:
             sys.exit(f"runner.py: {compiler} is {found}, not from the pixi "
                      f"environment; run via ./dev.py test")
-        probe = subprocess.run([compiler, "-x", "c++", "-fsyntax-only", "-"],
-                               input="", capture_output=True, text=True)
-        if probe.returncode == 0:
-            cxx.add(compiler)
-    return cxx
+
+
+def probe_std(compiler, std):
+    """True when compiler can build the C library headers as std.
+
+    Not every toolchain covers every mode: conda-forge's gcc package ships
+    only the C compiler, and on win-64 clang uses the MSVC C library, whose
+    headers need at least C++11. The probe excludes cxtr.h, so it can only
+    skip modes the platform lacks, never hide a fault in the header.
+    """
+    language = "c++" if std.startswith("c++") else "c"
+    source = "".join(f"#include <{header}>\n" for header in PROBE_HEADERS)
+    probe = subprocess.run([compiler, f"-std={std}", "-x", language,
+                            "-fsyntax-only", "-"],
+                           input=source, capture_output=True, text=True)
+    return probe.returncode == 0
 
 
 def run_job(job, workdir, verbose):
@@ -223,10 +232,18 @@ def main():
     args = parser.parse_args()
 
     compilers = args.compiler or list(COMPILERS)
-    cxx_capable = check_toolchain(compilers)
+    check_toolchain(compilers)
+    stds = [std for std in C_STDS + CXX_STDS
+            if not args.std or std in args.std]
+    with concurrent.futures.ThreadPoolExecutor(max(1, args.jobs)) as pool:
+        probes = {(compiler, std): pool.submit(probe_std, compiler, std)
+                  for compiler in compilers for std in stds}
+    usable = {key for key, probe in probes.items() if probe.result()}
     for compiler in compilers:
-        if compiler not in cxx_capable:
-            print(f"note: {compiler} has no C++ frontend, skipping C++ for it",
+        skipped = [std for std in stds if (compiler, std) not in usable]
+        if skipped:
+            print(f"note: {compiler} cannot compile the C library headers "
+                  f"as {', '.join(skipped)}; skipping those",
                   file=sys.stderr)
 
     cases = []
@@ -241,9 +258,7 @@ def main():
     jobs = [Job(case, compiler, std)
             for case in cases
             for compiler in case.compilers if compiler in compilers
-            for std in case.stds
-            if (not args.std or std in args.std)
-            and (not std.startswith("c++") or compiler in cxx_capable)]
+            for std in case.stds if (compiler, std) in usable]
     # An empty selection must not look like a passing test run.
     if not jobs:
         print("runner.py: no tests selected", file=sys.stderr)
